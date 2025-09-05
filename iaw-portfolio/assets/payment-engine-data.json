@@ -1,0 +1,746 @@
+{
+  "name": "Influencer Agency Payment & Payout Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "e9e9b81b-8e5f-4d9f-8d9b-986a760b21a5",
+      "name": "Run Daily at 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        640
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7f9a8607-4228-4444-a006-258079a4005c",
+      "name": "START",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        460,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "YOUR_DEALS_TABLE_ID",
+        "filterByFormula": "{Status} = '1. Approved for Invoicing'",
+        "options": {}
+      },
+      "id": "0633b41d-a2f0-4573-b6d4-8399580e5576",
+      "name": "1a. Get New Approved Deals",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        680,
+        280
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "2731804f-1355-46aa-a982-f5e6a92b212f",
+      "name": "Loop New Deals",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        900,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "invoice",
+        "operation": "create",
+        "lineItems": {
+          "lineItem": [
+            {
+              "amount": "={{ $json.fields['Deal Value'] }}",
+              "description": "={{ 'Influencer Campaign: ' + $json.fields['Campaign Name'] }}",
+              "detailType": "SalesItemLineDetail",
+              "salesItemLineDetail": {
+                "itemRef": {
+                  "value": "1"
+                }
+              }
+            }
+          ]
+        },
+        "customer": "={{ $json.fields['Brand Quickbooks Customer ID'] }}",
+        "additionalFields": {
+          "customerMemo": "Thank you for your business!",
+          "dueDate": "={{ $json.fields['Invoice Due Date'] }}"
+        }
+      },
+      "id": "672957c1-7b3f-4e01-92be-5a5078516d7a",
+      "name": "1b. Create Invoice in QuickBooks",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        280
+      ],
+      "credentials": {
+        "quickbooksOAuth2Api": {
+          "id": "YOUR_QUICKBOOKS_CREDENTIAL_ID",
+          "name": "Quickbooks Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{ $('Loop New Deals').json.fields['Brand Contact Email'] }}",
+        "subject": "={{ 'Invoice for ' + $('Loop New Deals').json.fields['Campaign Name'] }}",
+        "text": "Hi {{ $('Loop New Deals').json.fields['Brand Contact Name'] }},\n\nPlease find the invoice attached for the recent campaign: {{ $('Loop New Deals').json.fields['Campaign Name'] }}.\n\nInvoice Amount: ${{ $('Loop New Deals').json.fields['Deal Value'] }}\nDue Date: {{ new Date($('Loop New Deals').json.fields['Invoice Due Date']).toLocaleDateString() }}\n\nA payment link should be included on the invoice.\n\nThanks!",
+        "options": {}
+      },
+      "id": "97e64177-3e05-4c07-959c-6a16612e52b2",
+      "name": "1c. Send Invoice to Brand",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1340,
+        280
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "YOUR_DEALS_TABLE_ID",
+        "recordId": "={{ $('Loop New Deals').json.id }}",
+        "fields": {
+          "Status": "2. Invoiced - Awaiting Payment",
+          "Quickbooks Invoice ID": "={{ $('1b. Create Invoice in QuickBooks').json.Id }}"
+        },
+        "options": {}
+      },
+      "id": "18f99e3a-c85d-4034-9041-9a7c858df24b",
+      "name": "1d. Update Airtable Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        280
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "YOUR_DEALS_TABLE_ID",
+        "filterByFormula": "AND({Status} = '2. Invoiced - Awaiting Payment', IS_BEFORE({Invoice Due Date}, DATEADD(TODAY(), 10, 'days')))",
+        "options": {}
+      },
+      "id": "b96495b6-71e9-4679-b14a-f32f3d6c1fc6",
+      "name": "2a. Get Unpaid Invoices",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        680,
+        640
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "f583fecf-745a-4712-a72a-1eb95d468087",
+      "name": "Loop Unpaid Invoices",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        900,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dueDate = new Date($json.fields['Invoice Due Date']);\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nconst timeDiff = dueDate.getTime() - today.getTime();\nconst dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));\n\n$json.daysUntilDue = dayDiff;\n\nreturn $json;"
+      },
+      "id": "98144675-9c88-4c10-9b67-ab9f90f23d4f",
+      "name": "2b. Calculate Days Until Due",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.daysUntilDue }}",
+              "operation": "equal",
+              "value2": 3
+            }
+          ]
+        }
+      },
+      "id": "673f3299-8806-4447-98c4-11e25e98f029",
+      "name": "Due in 3 Days?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.daysUntilDue }}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "3dc2eb27-142c-4734-9366-267ca5258fde",
+      "name": "Due Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.daysUntilDue }}",
+              "operation": "equal",
+              "value2": -7
+            }
+          ]
+        }
+      },
+      "id": "e0b047ca-8077-494b-a91d-0cdce3c85a11",
+      "name": "7 Days Overdue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Email'] }}",
+        "subject": "Reminder: Invoice for {{ $('2b. Calculate Days Until Due').json.fields['Campaign Name'] }} is due soon",
+        "text": "Hi {{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Name'] }},\n\nThis is a friendly reminder that your invoice for ${{ $('2b. Calculate Days Until Due').json.fields['Deal Value'] }} is due in 3 days.\n\nThanks!",
+        "options": {}
+      },
+      "id": "060d4b00-47b6-45ef-891d-31742de80f4f",
+      "name": "Send Polite Reminder",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1560,
+        520
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Email'] }}",
+        "subject": "ACTION REQUIRED: Invoice for {{ $('2b. Calculate Days Until Due').json.fields['Campaign Name'] }} is due today",
+        "text": "Hi {{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Name'] }},\n\nThis is a reminder that your invoice for ${{ $('2b. Calculate Days Until Due').json.fields['Deal Value'] }} is due for payment today.\nPlease arrange for payment to avoid any disruption.\n\nThanks!",
+        "options": {}
+      },
+      "id": "848d7c0f-2e5e-49b8-b4b6-47b395679c16",
+      "name": "Send Firm Reminder",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1560,
+        640
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Email'] }}",
+        "subject": "URGENT: Invoice for {{ $('2b. Calculate Days Until Due').json.fields['Campaign Name'] }} is OVERDUE",
+        "text": "Hi {{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Name'] }},\n\nYour invoice for ${{ $('2b. Calculate Days Until Due').json.fields['Deal Value'] }} is now 7 days overdue. Please make payment immediately to avoid further action.\n\nThanks!",
+        "options": {}
+      },
+      "id": "040f29e1-209b-449e-b7d5-d7168c78da0a",
+      "name": "Send Escalation Email",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1560,
+        760
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "whatsapp:YOUR_TWILIO_WHATSAPP_NUMBER",
+        "to": "whatsapp:{{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Phone'] }}",
+        "body": "Hi {{ $('2b. Calculate Days Until Due').json.fields['Brand Contact Name'] }}. URGENT: Your invoice for ${{ $('2b. Calculate Days Until Due').json.fields['Deal Value'] }} is 7 days overdue. Please contact us immediately.",
+        "options": {}
+      },
+      "id": "3621da3b-f458-45e6-991f-0a06df5c68b6",
+      "name": "Send WhatsApp Escalation",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        760
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "YOUR_TWILIO_CREDENTIAL_ID",
+          "name": "Twilio Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "query",
+        "query": "SELECT * FROM Invoice WHERE MetaData.LastUpdatedTime >= '{{ $now.minus({days: 1}).toFormat('yyyy-MM-dd') }}T00:00:00Z' AND Balance = 0"
+      },
+      "id": "7632669e-1419-45e0-8806-a602b9f390ef",
+      "name": "3a. Get Recently Paid Invoices",
+      "type": "n8n-nodes-base.quickbooks",
+      "typeVersion": 1,
+      "position": [
+        680,
+        1000
+      ],
+      "credentials": {
+        "quickbooksOAuth2Api": {
+          "id": "YOUR_QUICKBOOKS_CREDENTIAL_ID",
+          "name": "Quickbooks Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "4691e843-982c-4ec7-995a-0d1989bd14dd",
+      "name": "Loop Paid Invoices",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        900,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "YOUR_DEALS_TABLE_ID",
+        "filterByFormula": "{Quickbooks Invoice ID} = '{{ $json.Id }}'",
+        "options": {}
+      },
+      "id": "b3e5f6e1-954f-4279-8d7b-9c3a380e2190",
+      "name": "3b. Find Deal in Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        1000
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.records[0].fields.Status }}",
+              "value2": "2. Invoiced - Awaiting Payment"
+            }
+          ]
+        }
+      },
+      "id": "92f722a2-4a00-47b6-a2a4-f58c7340b6e9",
+      "name": "Check if awaiting payment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.wise.com/v1/transfers",
+        "authentication": "bearerAuth",
+        "body": {
+          "source": "YOUR_WISE_SOURCE_ACCOUNT_ID",
+          "target": "={{ $('3b. Find Deal in Airtable').json.records[0].fields['Influencer Wise Target ID'] }}",
+          "quote": "YOUR_WISE_QUOTE_ID_FOR_THE_TRANSFER",
+          "customerTransactionId": "={{ $json.Id + '-' + $today.toFormat('X') }}",
+          "details": {
+            "reference": "Payout for {{ $('3b. Find Deal in Airtable').json.records[0].fields['Campaign Name'] }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "76506f36-9b57-414e-a108-9ec1b7e0d3ae",
+      "name": "3c. Trigger Payout via Wise",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1560,
+        1000
+      ],
+      "credentials": {
+        "bearerAuth": {
+          "id": "YOUR_WISE_CREDENTIAL_ID",
+          "name": "Wise Bearer Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "YOUR_DEALS_TABLE_ID",
+        "recordId": "={{ $('3b. Find Deal in Airtable').json.records[0].id }}",
+        "fields": {
+          "Status": "3. Paid - Payout Initiated",
+          "Wise Payout ID": "={{ $('3c. Trigger Payout via Wise').json.id }}"
+        },
+        "options": {}
+      },
+      "id": "9059f0f0-c1e1-4c6e-8260-2646d61d15c8",
+      "name": "3d. Update Airtable to Paid",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        1000
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{ $('3b. Find Deal in Airtable').json.records[0].fields['Influencer Email'] }}",
+        "subject": "Your Payout has been Sent!",
+        "text": "Hi {{ $('3b. Find Deal in Airtable').json.records[0].fields['Influencer Name'] }},\n\nGreat news! The payment from the brand for the '{{ $('3b. Find Deal in Airtable').json.records[0].fields['Campaign Name'] }}' campaign has been received.\n\nWe have initiated your payout of ${{ $('3b. Find Deal in Airtable').json.records[0].fields['Influencer Payout Amount'] }}. You should see it in your account in 2-3 business days.\n\nThanks for the great work!",
+        "options": {}
+      },
+      "id": "e72252a1-6a2c-4999-93b5-7d52601da0e6",
+      "name": "3e. Notify Influencer",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        2000,
+        1000
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Daily at 9 AM": {
+      "main": [
+        [
+          {
+            "node": "START",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START": {
+      "main": [
+        [
+          {
+            "node": "1a. Get New Approved Deals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "2a. Get Unpaid Invoices",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "3a. Get Recently Paid Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1a. Get New Approved Deals": {
+      "main": [
+        [
+          {
+            "node": "Loop New Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop New Deals": {
+      "main": [
+        [
+          {
+            "node": "1b. Create Invoice in QuickBooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1b. Create Invoice in QuickBooks": {
+      "main": [
+        [
+          {
+            "node": "1c. Send Invoice to Brand",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1c. Send Invoice to Brand": {
+      "main": [
+        [
+          {
+            "node": "1d. Update Airtable Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2a. Get Unpaid Invoices": {
+      "main": [
+        [
+          {
+            "node": "Loop Unpaid Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Unpaid Invoices": {
+      "main": [
+        [
+          {
+            "node": "2b. Calculate Days Until Due",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. Calculate Days Until Due": {
+      "main": [
+        [
+          {
+            "node": "Due in 3 Days?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Due Today?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "7 Days Overdue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Due in 3 Days?": {
+      "main": [
+        [
+          {
+            "node": "Send Polite Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Due Today?": {
+      "main": [
+        [
+          {
+            "node": "Send Firm Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7 Days Overdue?": {
+      "main": [
+        [
+          {
+            "node": "Send Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3a. Get Recently Paid Invoices": {
+      "main": [
+        [
+          {
+            "node": "Loop Paid Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Paid Invoices": {
+      "main": [
+        [
+          {
+            "node": "3b. Find Deal in Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3b. Find Deal in Airtable": {
+      "main": [
+        [
+          {
+            "node": "Check if awaiting payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if awaiting payment": {
+      "main": [
+        [
+          {
+            "node": "3c. Trigger Payout via Wise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3c. Trigger Payout via Wise": {
+      "main": [
+        [
+          {
+            "node": "3d. Update Airtable to Paid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3d. Update Airtable to Paid": {
+      "main": [
+        [
+          {
+            "node": "3e. Notify Influencer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

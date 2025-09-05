@@ -1,0 +1,650 @@
+{
+  "name": "Event Management & Vendor Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "c1d4e6a8-9b8f-4c7d-8e9a-0a7b6c5d4e3f",
+      "name": "Run Daily at 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        1040
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a9b8c7d6-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+      "name": "START",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        440,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblEvents",
+        "filterByFormula": "{Status} = '1. New'",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-d6e7-f8a9-0b1c2d3e4f5a",
+      "name": "1a. Get New Events",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        660,
+        440
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "e1f2a3b4-c5d6-e7f8-a90b-1c2d3e4f5a6b",
+      "name": "Loop New Events",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        880,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTemplates",
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-f8a9-0b1c-2d3e4f5a6b7c",
+      "name": "1b. Get Vendor Templates",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        440
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "a3b4c5d6-e7f8-a90b-1c2d-3e4f5a6b7c8d",
+      "name": "Loop Templates",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTasks",
+        "fields": {
+          "Task Name": "={{ $('Loop Templates').json.fields['Task Type'] }}",
+          "Event": [
+            "{{ $('Loop New Events').json.id }}"
+          ],
+          "Deliverable Description": "={{ $('Loop Templates').json.fields['Default Deliverable Description'] }}",
+          "Status": "Assigned",
+          "Deadline": "={{ $now.plus({ days: $('Loop Templates').json.fields['Typical Lead Time (Days)'] * -1 }).toFormat('yyyy-MM-dd') }}"
+        },
+        "options": {}
+      },
+      "id": "b4c5d6e7-f8a9-0b1c-2d3e-4f5a6b7c8d9e",
+      "name": "1c. Create Vendor Task",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        440
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblEvents",
+        "recordId": "={{ $('Loop New Events').json.id }}",
+        "fields": {
+          "Status": "2. In Progress"
+        },
+        "options": {}
+      },
+      "id": "c5d6e7f8-a90b-1c2d-3e4f-5a6b7c8d9e0f",
+      "name": "1d. Update Event Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        440
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTasks",
+        "filterByFormula": "AND(IS_BEFORE({Deadline}, TODAY()), OR({Status} = 'Assigned', {Status} = 'In Progress'))",
+        "options": {
+          "view": "viwOverdueTasks"
+        }
+      },
+      "id": "d6e7f8a9-0b1c-2d3e-4f5a-6b7c8d9e0f1a",
+      "name": "2a. Get Overdue Tasks",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        660,
+        840
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "e7f8a90b-1c2d-3e4f-5a6b-7c8d9e0f1a2b",
+      "name": "Loop Overdue Tasks",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        880,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $('Loop Overdue Tasks').json.fields['Vendor Contact Email (from Vendor)'] }}",
+        "subject": "OVERDUE: {{ $('Loop Overdue Tasks').json.fields['Task Name'] }} for {{ $('Loop Overdue Tasks').json.fields['Event Name (from Event)'] }}",
+        "text": "Hi {{ $('Loop Overdue Tasks').json.fields['Vendor Contact Name (from Vendor)'] }},\n\nThis is an automated reminder that your task '{{ $('Loop Overdue Tasks').json.fields['Task Name'] }}' is overdue as of {{ new Date($('Loop Overdue Tasks').json.fields.Deadline).toLocaleDateString() }}.\n\nPlease provide an update immediately.",
+        "options": {}
+      },
+      "id": "f8a90b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c",
+      "name": "2b. Send Vendor Reminder",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        840
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "YOUR_INTERNAL_ALERTS_SLACK_CHANNEL_ID",
+        "text": "🚨 **OVERDUE VENDOR TASK** 🚨\n*Event:* {{ $('Loop Overdue Tasks').json.fields['Event Name (from Event)'] }}\n*Task:* {{ $('Loop Overdue Tasks').json.fields['Task Name'] }}\n*Vendor:* {{ $('Loop Overdue Tasks').json.fields['Vendor Name (from Vendor)'] }}\n*Deadline:* {{ new Date($('Loop Overdue Tasks').json.fields.Deadline).toLocaleDateString() }}\nPlease follow up immediately.",
+        "options": {}
+      },
+      "id": "a90b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d",
+      "name": "2c. Internal Slack Escalation",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        840
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTasks",
+        "filterByFormula": "AND({Status} = '3. Deliverable Submitted', {Payment Status} != '1. Pending Approval')",
+        "options": {}
+      },
+      "id": "b0c1d2e3-f4a5-b6c7-d8e9-f0a1b2c3d4e5",
+      "name": "3a. Get Tasks for Approval",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        660,
+        1240
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "c1d2e3f4-a5b6-c7d8-e9f0-a1b2c3d4e5f6",
+      "name": "Loop Tasks for Approval",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        880,
+        1240
+      ]
+    },
+    {
+      "parameters": {
+        "channel": "YOUR_FINANCE_SLACK_CHANNEL_ID",
+        "text": "💸 **Vendor Payment Approval Request** 💸\n*Event:* {{ $('Loop Tasks for Approval').json.fields['Event Name (from Event)'] }}\n*Vendor:* {{ $('Loop Tasks for Approval').json.fields['Vendor Name (from Vendor)'] }}\n*Task:* {{ $('Loop Tasks for Approval').json.fields['Task Name'] }}\n*Amount:* ${{ $('Loop Tasks for Approval').json.fields['Contract Value'] }}\n\nPlease review and update the status in Airtable: YOUR_AIRTABLE_RECORD_LINK/{{ $('Loop Tasks for Approval').json.id }}",
+        "options": {}
+      },
+      "id": "d2e3f4a5-b6c7-d8e9-f0a1-b2c3d4e5f6a7",
+      "name": "3b. Notify Finance for Approval",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        1240
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTasks",
+        "recordId": "={{ $('Loop Tasks for Approval').json.id }}",
+        "fields": {
+          "Payment Status": "1. Pending Approval"
+        },
+        "options": {}
+      },
+      "id": "e3f4a5b6-c7d8-e9f0-a1b2-c3d4e5f6a7b8",
+      "name": "3c. Update Payment Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        1240
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblEvents",
+        "filterByFormula": "{Event End Date} = DATEADD(TODAY(), -1, 'days')",
+        "options": {}
+      },
+      "id": "f4a5b6c7-d8e9-f0a1-b2c3-d4e5f6a7b8c9",
+      "name": "5a. Get Events that Ended Yesterday",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        660,
+        1640
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "a5b6c7d8-e9f0-a1b2-c3d4-e5f6a7b8c9da",
+      "name": "Loop Finished Events",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        880,
+        1640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblVendorTasks",
+        "filterByFormula": "{Event ID} = '{{ $json.id }}'",
+        "options": {}
+      },
+      "id": "b6c7d8e9-f0a1-b2c3-d4e5-f6a7b8c9daeb",
+      "name": "5b. Get All Tasks for Event",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        1640
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "javascriptCode": "const tasks = $input.all();\nconst totalTasks = tasks.length;\nconst onTimeTasks = tasks.filter(t => t.json.fields.Status === 'Complete' && new Date(t.json.fields.Deadline) >= new Date(t.json.fields['Completed Date'])).length; // Assumes a 'Completed Date' field\nconst totalSpend = tasks.reduce((sum, t) => sum + (t.json.fields['Contract Value'] || 0), 0);\n\nconst onTimePercentage = totalTasks > 0 ? (onTimeTasks / totalTasks) * 100 : 0;\n\nreturn [{ json: {\n  eventName: $('Loop Finished Events').json.fields['Event Name'],\n  totalSpend: totalSpend.toFixed(2),\n  onTimePercentage: onTimePercentage.toFixed(1),\n  totalTasks: totalTasks,\n  rawTasks: tasks.map(t => t.json.fields)\n}}];"
+      },
+      "id": "c7d8e9f0-a1b2-c3d4-e5f6-a7b8c9daebfc",
+      "name": "5c. Aggregate Performance Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        1640
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-pro",
+        "prompt": "You are an event operations analyst. Based on the following data for the event '{{ $json.eventName }}', write a concise 3-bullet point summary for a management report.\n\nData:\n- Total Vendor Spend: ${{ $json.totalSpend }}\n- On-Time Vendor Task Completion: {{ $json.onTimePercentage }}%\n- Total Vendor Tasks Managed: {{ $json.totalTasks }}\n\nFocus on the key outcomes. For example: 'Achieved X% on-time delivery across Y vendors, with a total spend of $Z.'"
+      },
+      "id": "d8e9f0a1-b2c3-d4e5-f6a7-b8c9daebfcdg",
+      "name": "5d. Generate AI Report Summary",
+      "type": "n8n-nodes-base.googlePaLMApi",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        1640
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "YOUR_GOOGLE_AI_CREDENTIAL_ID",
+          "name": "Google AI Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "management@youreventagency.com",
+        "subject": "Post-Event Report: {{ $('5c. Aggregate Performance Data').json.eventName }}",
+        "html": "Hi Team,<br><br>Here is the automated post-event performance report for <strong>{{ $('5c. Aggregate Performance Data').json.eventName }}</strong>.<br><br><strong>AI Summary:</strong><br><ul><li>{{ $('5d. Generate AI Report Summary').json.candidates[0].content.parts[0].text.replace(/\\n/g, '</li><li>') }}</li></ul><br><strong>Key Metrics:</strong><br>- <strong>Total Vendor Spend:</strong> ${{ $('5c. Aggregate Performance Data').json.totalSpend }}<br>- <strong>On-Time Task Completion:</strong> {{ $('5c. Aggregate Performance Data').json.onTimePercentage }}%<br><br>Regards,<br>Your n8n Bot",
+        "options": {}
+      },
+      "id": "e9f0a1b2-c3d4-e5f6-a7b8-c9daebfcdgeh",
+      "name": "5e. Email Report to Management",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1760,
+        1640
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Daily at 8 AM": {
+      "main": [
+        [
+          {
+            "node": "START",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START": {
+      "main": [
+        [
+          {
+            "node": "1a. Get New Events",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "2a. Get Overdue Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "3a. Get Tasks for Approval",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "5a. Get Events that Ended Yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1a. Get New Events": {
+      "main": [
+        [
+          {
+            "node": "Loop New Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop New Events": {
+      "main": [
+        [
+          {
+            "node": "1b. Get Vendor Templates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "1d. Update Event Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1b. Get Vendor Templates": {
+      "main": [
+        [
+          {
+            "node": "Loop Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Templates": {
+      "main": [
+        [
+          {
+            "node": "1c. Create Vendor Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2a. Get Overdue Tasks": {
+      "main": [
+        [
+          {
+            "node": "Loop Overdue Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Overdue Tasks": {
+      "main": [
+        [
+          {
+            "node": "2b. Send Vendor Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2b. Send Vendor Reminder": {
+      "main": [
+        [
+          {
+            "node": "2c. Internal Slack Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3a. Get Tasks for Approval": {
+      "main": [
+        [
+          {
+            "node": "Loop Tasks for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Tasks for Approval": {
+      "main": [
+        [
+          {
+            "node": "3b. Notify Finance for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3b. Notify Finance for Approval": {
+      "main": [
+        [
+          {
+            "node": "3c. Update Payment Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5a. Get Events that Ended Yesterday": {
+      "main": [
+        [
+          {
+            "node": "Loop Finished Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Finished Events": {
+      "main": [
+        [
+          {
+            "node": "5b. Get All Tasks for Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5b. Get All Tasks for Event": {
+      "main": [
+        [
+          {
+            "node": "5c. Aggregate Performance Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5c. Aggregate Performance Data": {
+      "main": [
+        [
+          {
+            "node": "5d. Generate AI Report Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5d. Generate AI Report Summary": {
+      "main": [
+        [
+          {
+            "node": "5e. Email Report to Management",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

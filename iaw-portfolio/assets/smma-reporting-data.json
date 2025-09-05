@@ -1,0 +1,767 @@
+{
+  "name": "Combined SMMA Daily Data & Weekly Reporting",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "5243a41f-823d-4c31-9f79-2af41e57c152",
+      "name": "Run Daily at 3 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Client_List').params.sheetName }}",
+          "mode": "name"
+        },
+        "options": {
+          "filters": {
+            "filters": [
+              {
+                "key": "Status",
+                "value": "Active"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e446d3e3-774e-4f7f-8d26-646702e96417",
+      "name": "Get Active Clients",
+      "type": "n8n-nodes-base.googleSheet",
+      "typeVersion": 4,
+      "position": [
+        660,
+        340
+      ],
+      "credentials": {
+        "googleSheet": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheet Credential"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "2d1b72e1-4560-449d-b4ef-5e8a71dd25e9",
+      "name": "Loop Over Clients (Daily)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        880,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "adAccountId": "={{ $json.body.MetaAdAccountID }}",
+        "dateRange": {
+          "datePreset": "yesterday"
+        },
+        "fields": "spend,impressions,clicks,ctr,reach,actions"
+      },
+      "id": "4b68e7d2-9721-49b5-9036-79ef5723b7b5",
+      "name": "Fetch Meta Ads Data",
+      "type": "n8n-nodes-base.metaAds",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        -60
+      ],
+      "credentials": {
+        "metaAds": {
+          "id": "YOUR_META_CREDENTIAL_ID",
+          "name": "Meta Ads Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "customerId": "={{ $json.body.GoogleAdAccountID }}",
+        "query": "SELECT metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.ctr, metrics.conversions, metrics.all_conversions FROM ad_group WHERE segments.date DURING YESTERDAY"
+      },
+      "id": "c1f72782-b7e9-4467-873b-5f07ac69c9b9",
+      "name": "Fetch Google Ads Data",
+      "type": "n8n-nodes-base.googleAds",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        140
+      ],
+      "credentials": {
+        "googleAds": {
+          "id": "YOUR_GOOGLE_ADS_CREDENTIAL_ID",
+          "name": "Google Ads Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/",
+        "options": {
+          "body": {
+            "body": "{\n\t\"advertiser_id\": \"{{ $json.body.TikTokAdvertiserID }}\",\n\t\"service_type\": \"AUCTION\",\n\t\"report_type\": \"BASIC\",\n\t\"data_level\": \"AUCTION_AD\",\n\t\"dimensions\": [\"stat_time_day\"],\n\t\"metrics\": [\"spend\", \"impressions\", \"clicks\", \"ctr\", \"conversions\"],\n\t\"start_date\": \"{{ $today.minus(1, 'days').toFormat('yyyy-MM-dd') }}\",\n\t\"end_date\": \"{{ $today.minus(1, 'days').toFormat('yyyy-MM-dd') }}\"\n}"
+          },
+          "header": {
+            "header": [
+              {
+                "name": "Access-Token",
+                "value": "YOUR_TIKTOK_ACCESS_TOKEN"
+              }
+            ]
+          }
+        }
+      },
+      "id": "3e9b1689-53e9-43c2-8bb0-0081d0b7d4d4",
+      "name": "Fetch TikTok Ads Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1100,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Date",
+              "value": "={{ $today.minus(1, 'days').toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "ClientName",
+              "value": "={{ $('Loop Over Clients (Daily)').json.body.ClientName }}"
+            },
+            {
+              "name": "Platform",
+              "value": "Meta"
+            },
+            {
+              "name": "Spend",
+              "value": "={{ $json.spend }}"
+            },
+            {
+              "name": "Impressions",
+              "value": "={{ $json.impressions }}"
+            },
+            {
+              "name": "Clicks",
+              "value": "={{ $json.clicks }}"
+            },
+            {
+              "name": "CTR",
+              "value": "={{ $json.ctr }}"
+            },
+            {
+              "name": "Conversions",
+              "value": "={{ $json.actions ? $json.actions.find(a => a.action_type === 'onsite_conversion.post_save').value : 0 }}"
+            },
+            {
+              "name": "Reach",
+              "value": "={{ $json.reach }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0277317-0d53-4318-8f85-3b10b05b4507",
+      "name": "Format Meta Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Date",
+              "value": "={{ $today.minus(1, 'days').toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "ClientName",
+              "value": "={{ $('Loop Over Clients (Daily)').json.body.ClientName }}"
+            },
+            {
+              "name": "Platform",
+              "value": "Google"
+            },
+            {
+              "name": "Spend",
+              "value": "={{ $json.metrics.cost_micros / 1000000 }}"
+            },
+            {
+              "name": "Impressions",
+              "value": "={{ $json.metrics.impressions }}"
+            },
+            {
+              "name": "Clicks",
+              "value": "={{ $json.metrics.clicks }}"
+            },
+            {
+              "name": "CTR",
+              "value": "={{ $json.metrics.ctr }}"
+            },
+            {
+              "name": "Conversions",
+              "value": "={{ $json.metrics.conversions }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a9a3f9e9-01f7-417d-9279-3171f1146747",
+      "name": "Format Google Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "Date",
+              "value": "={{ $today.minus(1, 'days').toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "ClientName",
+              "value": "={{ $('Loop Over Clients (Daily)').json.body.ClientName }}"
+            },
+            {
+              "name": "Platform",
+              "value": "TikTok"
+            },
+            {
+              "name": "Spend",
+              "value": "={{ $json.data.list[0].metrics.spend }}"
+            },
+            {
+              "name": "Impressions",
+              "value": "={{ $json.data.list[0].metrics.impressions }}"
+            },
+            {
+              "name": "Clicks",
+              "value": "={{ $json.data.list[0].metrics.clicks }}"
+            },
+            {
+              "name": "CTR",
+              "value": "={{ $json.data.list[0].metrics.ctr }}"
+            },
+            {
+              "name": "Conversions",
+              "value": "={{ $json.data.list[0].metrics.conversions }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e605d336-7c9b-4394-a16f-9694e4a069ba",
+      "name": "Format TikTok Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1320,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Daily_Metrics_Data').params.sheetName }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "byHeader",
+          "value": {
+            "Date": "={{ $json.Date }}",
+            "ClientName": "={{ $json.ClientName }}",
+            "Platform": "={{ $json.Platform }}",
+            "Spend": "={{ $json.Spend }}",
+            "Impressions": "={{ $json.Impressions }}",
+            "Clicks": "={{ $json.Clicks }}",
+            "CTR": "={{ $json.CTR }}",
+            "Conversions": "={{ $json.Conversions }}",
+            "Reach": "={{ $json.Reach }}"
+          }
+        }
+      },
+      "id": "a931a030-9b62-4b2a-89a3-93d39580dd2a",
+      "name": "Append to Daily_Metrics_Data",
+      "type": "n8n-nodes-base.googleSheet",
+      "typeVersion": 4,
+      "position": [
+        1540,
+        140
+      ],
+      "credentials": {
+        "googleSheet": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheet Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $now.weekdayLong === 'Monday' }}"
+            }
+          ]
+        }
+      },
+      "id": "4b5d6f1a-0518-477d-8120-7f28ed987dbe",
+      "name": "Is it Monday?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        660,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Client_List').params.sheetName }}",
+          "mode": "name"
+        },
+        "options": {
+          "filters": {
+            "filters": [
+              {
+                "key": "Status",
+                "value": "Active"
+              }
+            ]
+          }
+        }
+      },
+      "id": "7de72d17-91a5-4811-9a4f-55eb84050215",
+      "name": "Get Active Clients (for Report)",
+      "type": "n8n-nodes-base.googleSheet",
+      "typeVersion": 4,
+      "position": [
+        880,
+        640
+      ],
+      "credentials": {
+        "googleSheet": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheet Credential"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "7eb7c86a-74ce-4a7a-9730-a8d0526e0e67",
+      "name": "Loop Over Clients (Weekly)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Daily_Metrics_Data').params.sheetName }}",
+          "mode": "name"
+        },
+        "options": {
+          "filters": {
+            "filters": [
+              {
+                "key": "ClientName",
+                "value": "={{ $json.body.ClientName }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "3bb8b1f8-0678-433b-810b-8d3810f92262",
+      "name": "Read Last 7 Days Data",
+      "type": "n8n-nodes-base.googleSheet",
+      "typeVersion": 4,
+      "position": [
+        1320,
+        640
+      ],
+      "credentials": {
+        "googleSheet": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheet Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "javascriptCode": "const sevenDaysAgo = new Date();\nsevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);\n\nconst items = $input.all();\nconst recentItems = items.filter(item => new Date(item.json.Date) >= sevenDaysAgo);\n\nif (recentItems.length === 0) {\n  return [{ json: { summary: null } }]; \n}\n\nconst summary = recentItems.reduce((acc, item) => {\n  acc.totalSpend += parseFloat(item.json.Spend) || 0;\n  acc.totalImpressions += parseInt(item.json.Impressions, 10) || 0;\n  acc.totalClicks += parseInt(item.json.Clicks, 10) || 0;\n  acc.totalConversions += parseInt(item.json.Conversions, 10) || 0;\n  return acc;\n}, { totalSpend: 0, totalImpressions: 0, totalClicks: 0, totalConversions: 0 });\n\nsummary.averageCTR = (summary.totalClicks / summary.totalImpressions) * 100;\nsummary.totalSpend = parseFloat(summary.totalSpend.toFixed(2));\nsummary.averageCTR = parseFloat(summary.averageCTR.toFixed(2));\n\nreturn [{ json: { weeklySummary: summary } }];\n"
+      },
+      "id": "278e99ef-87a3-4b68-8097-f58c42b10098",
+      "name": "Summarize Weekly Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-pro",
+        "prompt": "You are an expert digital marketing analyst writing a weekly performance summary for a client. Be concise, professional, and clear.\n\nHere is the data for the past week:\n{{ JSON.stringify($json.weeklySummary) }}\n\nBased on this data, write a 3-bullet point summary.\n- Start with the most important metric (e.g., leads or conversions).\n- Highlight the total ad spend and return.\n- Mention a key trend or insight (e.g., \"Facebook CTR improved by 12% this week, indicating strong creative performance.\").\n\nDo not add any conversational fluff. Just provide the summary."
+      },
+      "id": "b188c03c-e04c-474c-8bbd-bd40de13e639",
+      "name": "Generate AI Summary",
+      "type": "n8n-nodes-base.googlePaLMApi",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        640
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "YOUR_GOOGLE_AI_CREDENTIAL_ID",
+          "name": "Google AI Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "reportBody",
+              "value": "=Hi Team,\n\nHere is your automated performance summary for the past week:\n\n**AI-Generated Insights:**\n{{ $('Generate AI Summary').json.candidates[0].content.parts[0].text }}\n\n**Key Metrics:**\n- Total Spend: ${{ $('Summarize Weekly Metrics').json.weeklySummary.totalSpend }}\n- Total Conversions: {{ $('Summarize Weekly Metrics').json.weeklySummary.totalConversions }}\n- Total Clicks: {{ $('Summarize Weekly Metrics').json.weeklySummary.totalClicks }}\n\nFor a detailed, real-time breakdown, please view your live dashboard: {{ $('Loop Over Clients (Weekly)').json.body.LookerStudioLink }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "314fbb3a-d68f-4316-92f7-7278297b134d",
+      "name": "Compose Report",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Loop Over Clients (Weekly)').json.body.ReportingEmail }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "6d132dd5-333e-436d-9781-bfd2903820ac",
+      "name": "Email or Slack?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $('Loop Over Clients (Weekly)').json.body.ReportingEmail }}",
+        "subject": "Weekly Performance Report for {{ $('Loop Over Clients (Weekly)').json.body.ClientName }}",
+        "text": "={{ $('Compose Report').json.reportBody }}"
+      },
+      "id": "52c8b7f8-306d-4ebc-8d19-e5da470cdd60",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        2420,
+        540
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "={{ $('Loop Over Clients (Weekly)').json.body.SlackChannelID }}",
+        "text": "={{ $('Compose Report').json.reportBody }}"
+      },
+      "id": "6920f04f-0158-479e-b9e7-b50a26a455a0",
+      "name": "Send Slack Message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 3,
+      "position": [
+        2420,
+        740
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Daily at 3 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Active Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Clients": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Clients (Daily)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is it Monday?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Clients (Daily)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Meta Ads Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Google Ads Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch TikTok Ads Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Meta Ads Data": {
+      "main": [
+        [
+          {
+            "node": "Format Meta Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Google Ads Data": {
+      "main": [
+        [
+          {
+            "node": "Format Google Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch TikTok Ads Data": {
+      "main": [
+        [
+          {
+            "node": "Format TikTok Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Meta Data": {
+      "main": [
+        [
+          {
+            "node": "Append to Daily_Metrics_Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Google Data": {
+      "main": [
+        [
+          {
+            "node": "Append to Daily_Metrics_Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format TikTok Data": {
+      "main": [
+        [
+          {
+            "node": "Append to Daily_Metrics_Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it Monday?": {
+      "main": [
+        [
+          {
+            "node": "Get Active Clients (for Report)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Clients (for Report)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Clients (Weekly)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Clients (Weekly)": {
+      "main": [
+        [
+          {
+            "node": "Read Last 7 Days Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Last 7 Days Data": {
+      "main": [
+        [
+          {
+            "node": "Summarize Weekly Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Weekly Metrics": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Summary": {
+      "main": [
+        [
+          {
+            "node": "Compose Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Report": {
+      "main": [
+        [
+          {
+            "node": "Email or Slack?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email or Slack?": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

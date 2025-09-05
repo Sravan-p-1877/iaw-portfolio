@@ -1,0 +1,804 @@
+{
+  "name": "Influencer Content & Brand Deal Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6",
+      "name": "Run Daily at 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        1200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b2c3d4e5-f6a7-b8c9-d0e1-f2a3b4c5d6e7",
+      "name": "START",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        420,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeals",
+        "filterByFormula": "{Status} = '1. Accepted'",
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-c9d0-e1f2-a3b4c5d6e7f8",
+      "name": "1a. Get New Accepted Deals",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        640,
+        400
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "d4e5f6a7-b8c9-d0e1-f2a3-b4c5d6e7f8a9",
+      "name": "Loop New Deals",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        860,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": "primary",
+        "title": "={{ 'DRAFT DUE: ' + $json.fields['Campaign Name'] }}",
+        "start": "={{ $json.fields['First Draft Due Date'] }}",
+        "end": "={{ $json.fields['First Draft Due Date'] }}",
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-e1f2-a3b4-c5d6e7f8a9b0",
+      "name": "1b. Add Draft Deadline to Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [
+        1080,
+        400
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": "primary",
+        "title": "={{ 'POST LIVE: ' + $json.fields['Campaign Name'] }}",
+        "start": "={{ $json.fields['Final Post Date'] }}",
+        "end": "={{ $json.fields['Final Post Date'] }}",
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-f2a3-b4c5-d6e7f8a9b0c1",
+      "name": "1c. Add Post Date to Calendar",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [
+        1300,
+        400
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeals",
+        "recordId": "={{ $('Loop New Deals').json.id }}",
+        "fields": {
+          "Status": "2. In Progress"
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-a3b4-c5d6-e7f8a9b0c1d2",
+      "name": "1d. Update Deal Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        400
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "filterByFormula": "OR(DATESTR({Draft Due Date}) = DATESTR(TODAY()), DATESTR({Draft Due Date}) = DATESTR(DATEADD(TODAY(), 1, 'days')), DATESTR({Draft Due Date}) = DATESTR(DATEADD(TODAY(), 3, 'days')))",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-b4c5-d6e7-f8a9b0c1d2e3",
+      "name": "2a. Get Deliverables Due Soon",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        640,
+        800
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "c9d0e1f2-a3b4-c5d6-e7f8-a9b0c1d2e3f4",
+      "name": "Loop Due Deliverables",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        860,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "to": "influencer@email.com",
+        "subject": "REMINDER: Draft for {{ $('Loop Due Deliverables').json.fields['Campaign Name (from Deal)'] }} is due soon!",
+        "text": "Hi,\n\nJust a friendly reminder that your draft for the deliverable '{{ $('Loop Due Deliverables').json.fields.Name }}' is due on {{ new Date($('Loop Due Deliverables').json.fields['Draft Due Date']).toLocaleDateString() }}.\n\nDon't forget to upload it to the drive and update the status in Airtable!",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-d6e7-f8a9-b0c1d2e3f4a5",
+      "name": "2b. Send Draft Reminder",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1080,
+        800
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "filterByFormula": "{Status} = '3. Draft Ready for Review'",
+        "options": {}
+      },
+      "id": "e1f2a3b4-c5d6-e7f8-a9b0-c1d2e3f4a5b6",
+      "name": "3a. Get Drafts for Review",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        640,
+        1200
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "f2a3b4c5-d6e7-f8a9-b0c1-d2e3f4a5b6c7",
+      "name": "Loop Drafts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        860,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-pro",
+        "prompt": "You are a brand compliance checker. The following text is a draft caption for a social media post. Check if it contains ALL of the following required items:\n- Required Hashtags: {{ $('Loop Drafts').json.fields['Required Hashtags (from Deal)'] }}\n- Required Mentions/Tags: {{ $('Loop Drafts').json.fields['Required Mentions (from Deal)'] }}\n\nCaption Draft:\n\"{{ $('Loop Drafts').json.fields['Draft Caption'] }}\"\n\nRespond with 'PASS' if all items are present. Otherwise, respond with 'FAIL' followed by a list of the specific items that are missing."
+      },
+      "id": "a3b4c5d6-e7f8-a9b0-c1d2-e3f4a5b6c7d8",
+      "name": "3b. GPT Compliance Check",
+      "type": "n8n-nodes-base.googlePaLMApi",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        1200
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "YOUR_GOOGLE_AI_CREDENTIAL_ID",
+          "name": "Google AI Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('3b. GPT Compliance Check').json.candidates[0].content.parts[0].text }}",
+              "operation": "contains",
+              "value2": "PASS"
+            }
+          ]
+        }
+      },
+      "id": "b4c5d6e7-f8a9-b0c1-d2e3-f4a5b6c7d8e9",
+      "name": "Passed Check?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $('Loop Drafts').json.fields['Brand Contact Email (from Brand)'] }}",
+        "subject": "Draft for Review: {{ $('Loop Drafts').json.fields.Name }} for {{ $('Loop Drafts').json.fields['Campaign Name (from Deal)'] }}",
+        "html": "Hi {{ $('Loop Drafts').json.fields['Brand Contact Name (from Brand)'] }},<br><br>The draft for the upcoming deliverable '<strong>{{ $('Loop Drafts').json.fields.Name }}</strong>' is ready for your review.<br><br>You can view the draft here: <a href=\"{{ $('Loop Drafts').json.fields['Draft Link'] }}\">View Draft</a><br><br>Please provide any feedback by EOD tomorrow.<br><br>Thanks!",
+        "options": {}
+      },
+      "id": "c5d6e7f8-a9b0-c1d2-e3f4-a5b6c7d8e9f0",
+      "name": "3c. Email Brand for Review",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        1100
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "recordId": "={{ $('Loop Drafts').json.id }}",
+        "fields": {
+          "Status": "4. Awaiting Brand Approval"
+        },
+        "options": {}
+      },
+      "id": "d6e7f8a9-b0c1-d2e3-f4a5-b6c7d8e9f0a1",
+      "name": "3d. Update Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        1100
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "influencer@email.com",
+        "subject": "ACTION NEEDED: Compliance Check Failed for {{ $('Loop Drafts').json.fields.Name }}",
+        "html": "Hi,<br><br>The automated compliance check failed for your draft '<strong>{{ $('Loop Drafts').json.fields.Name }}</strong>'.<br><br><strong>Reason:</strong><br>{{ $('3b. GPT Compliance Check').json.candidates[0].content.parts[0].text.replace('FAIL', '') }}<br><br>Please correct the caption and set the status back to 'Draft Ready for Review'.",
+        "options": {}
+      },
+      "id": "e7f8a9b0-c1d2-e3f4-a5b6-c7d8e9f0a1b2",
+      "name": "Notify Influencer of Fail",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        1300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "filterByFormula": "{Status} = '7. Invoiced - Awaiting Payment'",
+        "options": {}
+      },
+      "id": "f8a9b0c1-d2e3-f4a5-b6c7-d8e9f0a1b2c3",
+      "name": "4a. Get Overdue Invoices",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        640,
+        1600
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "a9b0c1d2-e3f4-a5b6-c7d8-e9f0a1b2c3d4",
+      "name": "Loop Overdue",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        860,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dueDate = new Date($json.fields['Invoice Due Date']);\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nif (dueDate < today) {\n  return $json;\n}"
+      },
+      "id": "b0c1d2e3-f4a5-b6c7-d8e9-f0a1b2c3d4e5",
+      "name": "Check if Actually Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        1600
+      ]
+    },
+    {
+      "parameters": {
+        "to": "={{ $('Check if Actually Overdue').json.fields['Brand Contact Email (from Brand)'] }}",
+        "subject": "REMINDER: Invoice Overdue for {{ $('Check if Actually Overdue').json.fields['Campaign Name (from Deal)'] }}",
+        "text": "Hi {{ $('Check if Actually Overdue').json.fields['Brand Contact Name (from Brand)'] }},\n\nThis is a friendly reminder that your invoice for the deliverable '{{ $('Check if Actually Overdue').json.fields.Name }}' is now overdue.\n\nPlease arrange for payment at your earliest convenience.",
+        "options": {}
+      },
+      "id": "c1d2e3f4-a5b6-c7d8-e9f0-a1b2c3d4e5f6",
+      "name": "4b. Send Payment Reminder",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1300,
+        1600
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "filterByFormula": "AND({Status} = '6. Posted', DATETIME_DIFF(TODAY(), {Post Date}, 'days') >= 7)",
+        "options": {}
+      },
+      "id": "d2e3f4a5-b6c7-d8e9-f0a1-b2c3d4e5f6a7",
+      "name": "5a. Get Posts for Reporting",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        640,
+        2000
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "id": "e3f4a5b6-c7d8-e9f0-a1b2-c3d4e5f6a7b8",
+      "name": "Loop Posts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        860,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://unofficial-social-api.com/getMetrics",
+        "options": {
+          "body": {
+            "postUrl": "={{ $json.fields['Post URL'] }}"
+          }
+        }
+      },
+      "id": "f4a5b6c7-d8e9-f0a1-b2c3-d4e5f6a7b8c9",
+      "name": "5b. Fetch Post Metrics (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1080,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "tableId": "tblDeliverables",
+        "recordId": "={{ $('Loop Posts').json.id }}",
+        "fields": {
+          "Views": "={{ $('5b. Fetch Post Metrics (API)').json.views }}",
+          "Likes": "={{ $('5b. Fetch Post Metrics (API)').json.likes }}",
+          "Comments": "={{ $('5b. Fetch Post Metrics (API)').json.comments }}",
+          "Saves": "={{ $('5b. Fetch Post Metrics (API)').json.saves }}"
+        },
+        "options": {}
+      },
+      "id": "a5b6c7d8-e9f0-a1b2-c3d4-e5f6a7b8c9da",
+      "name": "5c. Update Airtable with Metrics",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        2000
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIAL_ID",
+          "name": "Airtable Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gemini-pro",
+        "prompt": "You are an influencer marketing analyst. Write a short, professional summary of a social media post's performance for a brand report. Be positive and concise.\n\nData:\n- Campaign: {{ $json.fields['Campaign Name (from Deal)'] }}\n- Platform: {{ $json.fields.Platform }}\n- Views: {{ $json.fields.Views }}\n- Likes: {{ $json.fields.Likes }}\n- Comments: {{ $json.fields.Comments }}\n- Saves: {{ $json.fields.Saves }}\n\nExample Output:\n\"The {{ $json.fields.Platform }} post for the {{ $json.fields['Campaign Name (from Deal)'] }} campaign performed exceptionally well, achieving {{ $json.fields.Views }} views and generating strong engagement with {{ $json.fields.Likes }} likes and {{ $json.fields.Comments }} comments.\""
+      },
+      "id": "b6c7d8e9-f0a1-b2c3-d4e5-f6a7b8c9daeb",
+      "name": "5d. Generate GPT Report Summary",
+      "type": "n8n-nodes-base.googlePaLMApi",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        2000
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "YOUR_GOOGLE_AI_CREDENTIAL_ID",
+          "name": "Google AI Credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{ $('5c. Update Airtable with Metrics').json.fields['Brand Contact Email (from Brand)'] }}",
+        "subject": "Performance Report for {{ $('5c. Update Airtable with Metrics').json.fields['Campaign Name (from Deal)'] }}",
+        "html": "Hi {{ $('5c. Update Airtable with Metrics').json.fields['Brand Contact Name (from Brand)'] }},<br><br>I'm excited to share the performance report for the recent post.<br><br><strong>Summary:</strong><br>{{ $('5d. Generate GPT Report Summary').json.candidates[0].content.parts[0].text }}<br><br><strong>Key Metrics:</strong><ul><li>Views: {{ $('5c. Update Airtable with Metrics').json.fields.Views }}</li><li>Likes: {{ $('5c. Update Airtable with Metrics').json.fields.Likes }}</li><li>Comments: {{ $('5c. Update Airtable with Metrics').json.fields.Comments }}</li><li>Saves: {{ $('5c. Update Airtable with Metrics').json.fields.Saves }}</li></ul><br>It was a pleasure working with you on this campaign!<br><br>Best,",
+        "options": {}
+      },
+      "id": "c7d8e9f0-a1b2-c3d4-e5f6-a7b8c9daebfc",
+      "name": "5e. Email Report to Brand",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 3,
+      "position": [
+        1740,
+        2000
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP Credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run Daily at 9 AM": {
+      "main": [
+        [
+          {
+            "node": "START",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START": {
+      "main": [
+        [
+          {
+            "node": "1a. Get New Accepted Deals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "2a. Get Deliverables Due Soon",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "3a. Get Drafts for Review",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "4a. Get Overdue Invoices",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "5a. Get Posts for Reporting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1a. Get New Accepted Deals": {
+      "main": [
+        [
+          {
+            "node": "Loop New Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop New Deals": {
+      "main": [
+        [
+          {
+            "node": "1b. Add Draft Deadline to Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1b. Add Draft Deadline to Calendar": {
+      "main": [
+        [
+          {
+            "node": "1c. Add Post Date to Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1c. Add Post Date to Calendar": {
+      "main": [
+        [
+          {
+            "node": "1d. Update Deal Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2a. Get Deliverables Due Soon": {
+      "main": [
+        [
+          {
+            "node": "Loop Due Deliverables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Due Deliverables": {
+      "main": [
+        [
+          {
+            "node": "2b. Send Draft Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3a. Get Drafts for Review": {
+      "main": [
+        [
+          {
+            "node": "Loop Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Drafts": {
+      "main": [
+        [
+          {
+            "node": "3b. GPT Compliance Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3b. GPT Compliance Check": {
+      "main": [
+        [
+          {
+            "node": "Passed Check?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passed Check?": {
+      "main": [
+        [
+          {
+            "node": "3c. Email Brand for Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Influencer of Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3c. Email Brand for Review": {
+      "main": [
+        [
+          {
+            "node": "3d. Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4a. Get Overdue Invoices": {
+      "main": [
+        [
+          {
+            "node": "Loop Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Overdue": {
+      "main": [
+        [
+          {
+            "node": "Check if Actually Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Actually Overdue": {
+      "main": [
+        [
+          {
+            "node": "4b. Send Payment Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5a. Get Posts for Reporting": {
+      "main": [
+        [
+          {
+            "node": "Loop Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Posts": {
+      "main": [
+        [
+          {
+            "node": "5b. Fetch Post Metrics (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5b. Fetch Post Metrics (API)": {
+      "main": [
+        [
+          {
+            "node": "5c. Update Airtable with Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5c. Update Airtable with Metrics": {
+      "main": [
+        [
+          {
+            "node": "5d. Generate GPT Report Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5d. Generate GPT Report Summary": {
+      "main": [
+        [
+          {
+            "node": "5e. Email Report to Brand",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
